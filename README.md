@@ -10,7 +10,8 @@
 
 ## roadmap
 
-- tab out (closes and reopens tab) coming soon
+- auto custom tab out (closes and reopens tab) coming soon
+- universal chat
 
 star the repo fr
 
