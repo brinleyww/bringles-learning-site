@@ -7,13 +7,14 @@
 - search
 - debug mode
 - PROGRESS SAVES!!
+- INSTANT custom tab out feature
 
 ## roadmap
 
-- auto custom tab out (closes and reopens tab) coming soon
 - universal chat
 
 star the repo fr
 
- WILL UPDATE IF BLOCKED
- 4 da bois
+4 da bois
+
+NOTE: do not play in class when the teacher has a monitoring app on. even without a blocking plan, admins can easily see this site and it will get block on your computer. only play when monitoring is completely off or during break periods.
