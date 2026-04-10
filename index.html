@@ -12,6 +12,7 @@
 <style>
 :root {
   --pink:#ff5fa2;
+  --blue:#38bdf8;
 }
 
 /* ===== RESET ===== */
@@ -102,6 +103,7 @@ body {
 
 /* ===== LAUNCHER ===== */
 .launcher {
+  position: relative; /* Added so settings button stays inside */
   width: 420px;
   padding: 22px;
   border-radius: 26px;
@@ -116,6 +118,63 @@ h1 {
   transform: rotate(-2deg);
 }
 
+/* ===== SETTINGS BUTTON ===== */
+.settings-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.settings-btn:hover {
+  transform: rotate(90deg);
+}
+
+/* ===== SETTINGS MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background: white;
+  padding: 25px;
+  border-radius: 20px;
+  width: 350px;
+  text-align: center;
+  border: 4px dashed var(--blue);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.modal-content h2 {
+  color: var(--blue);
+  margin-top: 0;
+}
+
+.modal-content p {
+  margin: 10px 0;
+  font-weight: bold;
+}
+
+/* ===== INPUTS & BUTTONS ===== */
 input {
   width: 100%;
   padding: 12px;
@@ -124,22 +183,53 @@ input {
   border: 3px dashed var(--pink);
   outline: none;
   margin-bottom: 12px;
+  font-family: inherit;
 }
 
-/* ===== GAME LIST (MINIMAL) ===== */
+button {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1em;
+  font-weight: bold;
+  border-radius: 22px;
+  cursor: pointer;
+  background: transparent;
+  border: 3px solid currentColor;
+  color: #111;
+  transition: transform .12s, box-shadow .12s, background .12s;
+  font-family: inherit;
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.buttons button { flex: 1; }
+.random { color: limegreen; }
+.last { color: deepskyblue; }
+.save-btn { color: var(--pink); margin-top: 15px; }
+.config-btn { color: var(--blue); margin-bottom: 15px; border-style: dashed; }
+
+button:hover {
+  background: rgba(0,0,0,.05);
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+/* ===== GAME LIST ===== */
 .list {
   max-height: 260px;
   overflow-y: auto;
   padding-right: 6px;
 }
 
-.list::-webkit-scrollbar {
-  width: 6px;
-}
-.list::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,.15);
-  border-radius: 10px;
-}
+.list::-webkit-scrollbar { width: 6px; }
+.list::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 10px; }
 
 .game {
   position: relative;
@@ -168,49 +258,7 @@ input {
   transform: translateX(4px);
 }
 
-.game:hover::before {
-  opacity: 1;
-}
-
-/* ===== OUTLINED BUTTONS ===== */
-.buttons {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-button {
-  flex: 1;
-  padding: 14px;
-  font-size: 1.1em;
-  font-weight: bold;
-  border-radius: 22px;
-  cursor: pointer;
-
-  background: transparent;
-  border: 3px solid currentColor;
-  color: #111;
-
-  transition: transform .12s, box-shadow .12s, background .12s;
-}
-
-.random { color: limegreen; }
-.last { color: deepskyblue; }
-
-button:hover {
-  background: rgba(255,255,255,.35);
-  box-shadow:
-    0 0 0 4px rgba(0,0,0,.06),
-    0 0 18px currentColor;
-  transform: translateY(-2px);
-}
-
-button:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 0 0 2px rgba(0,0,0,.1),
-    0 0 8px currentColor;
-}
+.game:hover::before { opacity: 1; }
 </style>
 </head>
 
@@ -219,7 +267,9 @@ button:active {
 <div class="bg" id="bg"></div>
 <div class="particles" id="particles"></div>
 
+<!-- MAIN LAUNCHER -->
 <div class="launcher">
+  <button class="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
   <h1>🎲 CHAOS GAME LAUNCHER</h1>
   <input id="search" placeholder="Search your doom..." autocomplete="off">
   <div class="list" id="gameList"></div>
@@ -229,17 +279,30 @@ button:active {
   </div>
 </div>
 
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-content">
+    <h2>⚙️ Settings</h2>
+    
+    <p>Tab-Out (Panic) Key:</p>
+    <button class="config-btn" id="keyBtn" onclick="startKeyConfig()">Not Set (Click to Bind)</button>
+    
+    <p>Tab-Out URL Redirect:</p>
+    <input id="panicUrl" placeholder="https://classroom.google.com" autocomplete="off">
+    
+    <button class="save-btn" onclick="closeSettings()">Save & Close</button>
+  </div>
+</div>
+
 <script>
-/* ===== PARALLAX ===== */
+/* ===== PARALLAX & PARTICLES (Kept Original) ===== */
 const bg = document.getElementById("bg");
 addEventListener("mousemove", e => {
   bg.style.setProperty("--mx", (e.clientX / innerWidth - .5) * 15 + "px");
   bg.style.setProperty("--my", (e.clientY / innerHeight - .5) * 15 + "px");
 });
 
-/* ===== PARTICLES ===== */
 const particles = document.getElementById("particles");
-
 for (let i=0;i<40;i++) {
   const p=document.createElement("div");
   p.className="particle";
@@ -249,7 +312,6 @@ for (let i=0;i<40;i++) {
   p.style.animationDelay=Math.random()*10+"s";
   particles.appendChild(p);
 }
-
 for (let i=0;i<25;i++) {
   const d=document.createElement("div");
   d.className="dust";
@@ -260,9 +322,66 @@ for (let i=0;i<25;i++) {
   particles.appendChild(d);
 }
 
-/* ===== GAME LOGIC ===== */
+/* ===== TAB-OUT / PANIC BUTTON LOGIC ===== */
+const modal = document.getElementById("settingsModal");
+const keyBtn = document.getElementById("keyBtn");
+const urlInput = document.getElementById("panicUrl");
 
-// We moved the games.json data directly into this array!
+// Load saved settings on startup
+let savedKey = localStorage.getItem("panicKey") || null;
+let savedUrl = localStorage.getItem("panicUrl") || "https://classroom.google.com";
+let isConfiguring = false;
+
+// Update inputs with saved data
+if (savedKey) keyBtn.textContent = `Current Key: [ ${savedKey} ]`;
+urlInput.value = savedUrl;
+
+function openSettings() {
+  modal.classList.add("show");
+}
+
+function closeSettings() {
+  modal.classList.remove("show");
+  
+  // Format and save the URL
+  let newUrl = urlInput.value.trim();
+  if (newUrl !== "" && !newUrl.startsWith("http")) {
+    newUrl = "https://" + newUrl; // Auto-add https:// if they forget
+  }
+  savedUrl = newUrl;
+  localStorage.setItem("panicUrl", savedUrl);
+}
+
+function startKeyConfig() {
+  isConfiguring = true;
+  keyBtn.textContent = "Press any key...";
+  keyBtn.style.backgroundColor = "rgba(56, 189, 248, 0.2)"; // Highlight blue
+}
+
+// Global Keyboard Listener
+window.addEventListener("keydown", (e) => {
+  // 1. If we are configuring the key inside settings
+  if (isConfiguring) {
+    e.preventDefault(); // Stop scrolling/searching while binding
+    savedKey = e.key;
+    localStorage.setItem("panicKey", savedKey);
+    
+    keyBtn.textContent = `Current Key: [ ${savedKey} ]`;
+    keyBtn.style.backgroundColor = "transparent";
+    isConfiguring = false;
+    return;
+  }
+
+  // 2. The actual Panic/Tab-out trigger
+  // (Ignore if they are typing in the search bar or url input)
+  if (savedKey && e.key === savedKey && document.activeElement.tagName !== "INPUT") {
+    // window.location.replace removes this site from the back-button history!
+    window.location.replace(savedUrl);
+  }
+});
+
+
+/* ===== GAME LOGIC (Kept Original) ===== */
 const games =[
   "Silly things/10todawn/index.html",
   "Silly things/A Difficult Game About Climbing (1).html",
@@ -352,7 +471,6 @@ const games =[
 const listEl=document.getElementById("gameList");
 const search=document.getElementById("search");
 
-// Start rendering immediately!
 render();
 
 function cleanName(p){
