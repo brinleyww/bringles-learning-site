@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinite Clicker Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .stats {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        #clickerButton {
+            display: block;
+            width: 200px;
+            height: 200px;
+            margin: 20px auto;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.3s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        #clickerButton:hover {
+            background-color: #2980b9;
+        }
+        #clickerButton:active {
+            transform: scale(0.95);
+        }
+        .upgrade {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button.upgrade-btn {
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        button.upgrade-btn:hover {
+            background-color: #27ae60;
+        }
+        button.upgrade-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .floating-text {
+            position: absolute;
+            animation: float-up 1s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes float-up {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Infinite Clicker Game</h1>
+        
+        <div class="stats">
+            <h2>Points: <span id="points">0</span></h2>
+            <p>Points per click: <span id="pointsPerClick">1</span></p>
+            <p>Points per second: <span id="pointsPerSecond">0</span></p>
+        </div>
+        
+        <button id="clickerButton">CLICK ME!</button>
+        
+        <h2>Upgrades</h2>
+        <div id="upgradesContainer">
+            <!-- Upgrades will be added here dynamically -->
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        const game = {
+            points: 0,
+            pointsPerClick: 1,
+            pointsPerSecond: 0,
+            multiplier: 1,
+            
+            // Upgrade definitions
+            upgrades: [
+                {
+                    id: 'clickPower',
+                    name: 'Click Power',
+                    description: 'Increase points per click',
+                    level: 1,
+                    baseCost: 10,
+                    costMultiplier: 1.15,
+                    effect: (level) => level,
+                    applyEffect: function() {
+                        game.calculatePointsPerClick();
+                    }
+                },
+                {
+                    id: 'autoClicker',
+                    name: 'Auto Clicker',
+                    description: 'Automatically generates points',
+                    level: 0,
+                    baseCost: 50,
+                    costMultiplier: 1.15,
+                    effect: (level) => level,
+                    applyEffect: function() {
+                        game.pointsPerSecond = this.effect(this.level) * game.multiplier;
+                    }
+                },
+                {
+                    id: 'multiplier',
+                    name: 'Multiplier',
+                    description: 'Multiplies all points earned',
+                    level: 1,
+                    baseCost: 100,
+                    costMultiplier: 1.5,
+                    effect: (level) => 1 + (level - 1) * 0.2,
+                    applyEffect: function() {
+                        game.multiplier = this.effect(this.level);
+                        game.calculatePointsPerClick();
+                        game.upgrades[1].applyEffect(); // Update auto clicker
+                    }
+                }
+            ],
+            
+            // Calculate points per click based on upgrades
+            calculatePointsPerClick: function() {
+                const clickPower = this.upgrades[0].effect(this.upgrades[0].level);
+                this.pointsPerClick = clickPower * this.multiplier;
+            },
+            
+            // Calculate cost of an upgrade
+            calculateUpgradeCost: function(upgrade) {
+                return Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
+            },
+            
+            // Purchase an upgrade
+            purchaseUpgrade: function(upgradeId) {
+                const upgrade = this.upgrades.find(u => u.id === upgradeId);
+                if (!upgrade) return;
+                
+                const cost = this.calculateUpgradeCost(upgrade);
+                
+                if (this.points >= cost) {
+                    this.points -= cost;
+                    upgrade.level++;
+                    upgrade.applyEffect();
+                    updateUI();
+                }
+            },
+            
+            // Save game to localStorage
+            saveGame: function() {
+                localStorage.setItem('clickerGame', JSON.stringify({
+                    points: this.points,
+                    upgrades: this.upgrades.map(u => ({ id: u.id, level: u.level }))
+                }));
+            },
+            
+            // Load game from localStorage
+            loadGame: function() {
+                const savedGame = localStorage.getItem('clickerGame');
+                if (savedGame) {
+                    const parsed = JSON.parse(savedGame);
+                    this.points = parsed.points;
+                    
+                    parsed.upgrades.forEach(savedUpgrade => {
+                        const upgrade = this.upgrades.find(u => u.id === savedUpgrade.id);
+                        if (upgrade) {
+                            upgrade.level = savedUpgrade.level;
+                        }
+                    });
+                    
+                    // Apply all upgrade effects
+                    this.upgrades.forEach(upgrade => upgrade.applyEffect());
+                }
+            }
+        };
+        
+        // DOM elements
+        const elements = {
+            points: document.getElementById('points'),
+            pointsPerClick: document.getElementById('pointsPerClick'),
+            pointsPerSecond: document.getElementById('pointsPerSecond'),
+            clickerButton: document.getElementById('clickerButton'),
+            upgradesContainer: document.getElementById('upgradesContainer')
+        };
+        
+        // Format large numbers
+        function formatNumber(num) {
+            if (num < 1000) return Math.floor(num);
+            
+            const suffixes = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+            const exponent = Math.floor(Math.log10(num) / 3);
+            const suffix = suffixes[exponent] || `e${exponent * 3}`;
+            
+            return (num / Math.pow(10, exponent * 3)).toFixed(1) + suffix;
+        }
+        
+        // Update UI with current game state
+        function updateUI() {
+            elements.points.textContent = formatNumber(game.points);
+            elements.pointsPerClick.textContent = formatNumber(game.pointsPerClick);
+            elements.pointsPerSecond.textContent = formatNumber(game.pointsPerSecond);
+            
+            // Update upgrade buttons
+            game.upgrades.forEach(upgrade => {
+                const cost = game.calculateUpgradeCost(upgrade);
+                const upgradeElement = document.getElementById(`upgrade-${upgrade.id}`);
+                
+                if (upgradeElement) {
+                    const levelElement = upgradeElement.querySelector('.upgrade-level');
+                    const costElement = upgradeElement.querySelector('.upgrade-cost');
+                    const buttonElement = upgradeElement.querySelector('button');
+                    
+                    levelElement.textContent = upgrade.level;
+                    costElement.textContent = formatNumber(cost);
+                    buttonElement.disabled = game.points < cost;
+                    
+                    // Show effect value for multiplier
+                    if (upgrade.id === 'multiplier') {
+                        const effectElement = upgradeElement.querySelector('.upgrade-effect');
+                        if (effectElement) {
+                            effectElement.textContent = upgrade.effect(upgrade.level).toFixed(1) + 'x';
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create upgrade elements
+        function createUpgradeElements() {
+            game.upgrades.forEach(upgrade => {
+                const upgradeElement = document.createElement('div');
+                upgradeElement.className = 'upgrade';
+                upgradeElement.id = `upgrade-${upgrade.id}`;
+                
+                let effectHtml = '';
+                if (upgrade.id === 'multiplier') {
+                    effectHtml = `<p>Current: <span class="upgrade-effect">${upgrade.effect(upgrade.level).toFixed(1)}x</span></p>`;
+                }
+                
+                upgradeElement.innerHTML = `
+                    <h3>${upgrade.name}</h3>
+                    <p>${upgrade.description}</p>
+                    <p>Level: <span class="upgrade-level">${upgrade.level}</span></p>
+                    ${effectHtml}
+                    <p>Cost: <span class="upgrade-cost">${formatNumber(game.calculateUpgradeCost(upgrade))}</span> points</p>
+                    <button class="upgrade-btn" onclick="game.purchaseUpgrade('${upgrade.id}')">Upgrade</button>
+                `;
+                
+                elements.upgradesContainer.appendChild(upgradeElement);
+            });
+        }
+        
+        // Click handler
+        function handleClick() {
+            game.points += game.pointsPerClick;
+            
+            // Create floating text effect
+            const floatingText = document.createElement('div');
+            floatingText.className = 'floating-text';
+            floatingText.textContent = `+${formatNumber(game.pointsPerClick)}`;
+            floatingText.style.left = `${Math.random() * 150 + 25}px`;
+            floatingText.style.top = `${Math.random() * 50 + 25}px`;
+            floatingText.style.color = '#3498db';
+            floatingText.style.fontWeight = 'bold';
+            
+            elements.clickerButton.parentNode.appendChild(floatingText);
+            
+            setTimeout(() => floatingText.remove(), 1000);
+            
+            updateUI();
+        }
+        
+        // Auto-clicker tick
+        function autoClickerTick() {
+            if (game.pointsPerSecond > 0) {
+                game.points += game.pointsPerSecond / 10; // 10 updates per second
+                updateUI();
+            }
+        }
+        
+        // Initialize game
+        function initGame() {
+            game.loadGame();
+            createUpgradeElements();
+            updateUI();
+            
+            // Set up event listeners
+            elements.clickerButton.addEventListener('click', handleClick);
+            
+            // Set up auto-clicker and auto-save intervals
+            setInterval(autoClickerTick, 100);
+            setInterval(() => game.saveGame(), 10000);
+            
+            // Add offline progress
+            const lastTime = localStorage.getItem('lastTime');
+            if (lastTime && game.pointsPerSecond > 0) {
+                const offlineTime = (Date.now() - parseInt(lastTime)) / 1000;
+                if (offlineTime > 10) {
+                    const offlinePoints = game.pointsPerSecond * offlineTime;
+                    game.points += offlinePoints;
+                    alert(`Welcome back! You earned ${formatNumber(offlinePoints)} points while away.`);
+                }
+            }
+            
+            // Update last time on page unload
+            window.addEventListener('beforeunload', () => {
+                localStorage.setItem('lastTime', Date.now().toString());
+            });
+            
+            // Add keyboard shortcut (spacebar to click)
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    handleClick();
+                }
+            });
+        }
+        
+        // Start the game
+        initGame();
+    </script>
+</body>
+</html>

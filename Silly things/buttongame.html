@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Try Me 😏</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #e0f7fa;
+      font-family: Comic Sans MS, cursive;
+    }
+
+    .button {
+      position: absolute;
+      padding: 10px 20px;
+      background: deeppink;
+      color: white;
+      border: 2px dashed black;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 16px;
+      box-shadow: 3px 3px 0 black;
+      transition: transform 0.1s ease;
+    }
+
+    .button:hover {
+      transform: scale(1.1);
+    }
+
+    #counter {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      font-size: 18px;
+      background: white;
+      padding: 8px 12px;
+      border: 2px solid black;
+      border-radius: 10px;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+
+<div id="counter">Score: 0</div>
+
+<script>
+  let score = 0;
+  let round = 1;
+  const body = document.body;
+  const counter = document.getElementById("counter");
+
+  function createButton(isReal) {
+    const btn = document.createElement("button");
+    btn.className = "button";
+    btn.textContent = "Click Me!";
+
+    // Random position
+    const x = Math.random() * (window.innerWidth - 120);
+    const y = Math.random() * (window.innerHeight - 50);
+    btn.style.left = `${x}px`;
+    btn.style.top = `${y}px`;
+
+    if (isReal) {
+      btn.addEventListener("click", () => {
+        score++;
+        round++;
+        counter.textContent = `Score: ${score}`;
+        removeAllButtons();
+        spawnButtons(round);
+      });
+    }
+
+    body.appendChild(btn);
+  }
+
+  function removeAllButtons() {
+    document.querySelectorAll(".button").forEach(btn => btn.remove());
+  }
+
+  function spawnButtons(count) {
+    const realIndex = Math.floor(Math.random() * count);
+    for (let i = 0; i < count; i++) {
+      createButton(i === realIndex);
+    }
+  }
+
+  // Start with just one button
+  spawnButtons(1);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mini KSP Lite</title>
+<style>
+body { margin:0; overflow:hidden; font-family:sans-serif; background:#111; color:#fff; }
+canvas { display:block; margin:0; background:#000; }
+#vab {
+  position:absolute; left:0; top:0; width:200px; height:100%; background:#222; padding:10px; box-sizing:border-box; overflow-y:auto;
+}
+.part { background:#444; margin:5px 0; padding:5px; cursor:pointer; text-align:center; user-select:none; }
+.part.engine { background:red; }
+.part.fuelLiquid { background:blue; }
+.part.fuelSolid { background:orange; }
+.part.pod { background:white; }
+.part.wing { background:green; }
+.part.decoupler { background:yellow; }
+.part.heatshield { background:#888; }
+.part.solar { background:#ffd700; }
+#launchControls { position:absolute; bottom:10px; left:220px; display:none; }
+button { margin:2px; padding:5px; }
+</style>
+</head>
+<body>
+<div id="vab"></div>
+<canvas id="game"></canvas>
+<div id="launchControls">
+  <button id="throttleUp">Throttle +</button>
+  <button id="throttleDown">Throttle -</button>
+  <button id="rotateLeft">Rotate &lt;</button>
+  <button id="rotateRight">Rotate &gt;</button>
+  <button id="stage">Stage</button>
+  <button id="toPad">Move to Launch Pad</button>
+</div>
+<script>
+// --- Canvas Setup ---
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+window.addEventListener('resize', ()=>{ canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+// --- Game State ---
+let mode = 'vab';
+let rocket = { parts: [], x:0, y:0, vx:0, vy:0, angle:0, throttle:0.5, stage:0, launched:false };
+let trajectory = [];
+
+// --- Planets ---
+const planets = [
+  { x: canvas.width*0.7, y: canvas.height*0.7, radius:200, mass:500000, colors:['#6a5acd','#483d8b'] },
+  { x: canvas.width*0.3, y: canvas.height*0.5, radius:150, mass:200000, colors:['#ff6347','#8b0000'] },
+  { x: canvas.width*0.5, y: canvas.height*0.2, radius:100, mass:100000, colors:['#20b2aa','#008b8b'] }
+];
+
+// --- Parts Definition ---
+const partsList = [
+  { name:'Pod', type:'pod', width:30, height:30 },
+  { name:'Engine', type:'engine', width:20, height:40, thrust:0.2 },
+  { name:'Fuel Tank (Liquid)', type:'fuelLiquid', width:20, height:40, fuel:100 },
+  { name:'Fuel Tank (Solid)', type:'fuelSolid', width:20, height:40, fuel:50 },
+  { name:'Wing', type:'wing', width:40, height:10 },
+  { name:'Decoupler', type:'decoupler', width:30, height:10 },
+  { name:'Heat Shield', type:'heatshield', width:40, height:20 },
+  { name:'Solar Panel', type:'solar', width:50, height:10 }
+];
+
+// --- Populate VAB ---
+const vab = document.getElementById('vab');
+partsList.forEach(p=>{
+  const el = document.createElement('div');
+  el.className='part '+p.type;
+  el.textContent=p.name;
+  el.addEventListener('mousedown', ()=>{ 
+    selectedPart = { ...p, x:canvas.width/2, y:canvas.height/2 }; 
+    offsetX = p.width/2; offsetY = p.height/2;
+  });
+  vab.appendChild(el);
+});
+
+// --- Drag & Snap ---
+let selectedPart = null;
+let offsetX=0, offsetY=0;
+let dragChildren = [];
+
+// Dragging logic
+canvas.addEventListener('mousedown', e=>{
+  if(mode!=='vab') return;
+  if(rocket.parts.length>0){
+    for(let i=0;i<rocket.parts.length;i++){
+      const p = rocket.parts[i];
+      if(e.clientX >= p.x-p.width/2 && e.clientX <= p.x+p.width/2 &&
+         e.clientY >= p.y-p.height/2 && e.clientY <= p.y+p.height/2){
+        if(i===0){
+          // Root part
+          selectedPart = {...p};
+          offsetX = e.clientX - p.x;
+          offsetY = e.clientY - p.y;
+          dragChildren = rocket.parts.slice(1);
+          rocket.parts = [];
+        } else {
+          selectedPart = {...p};
+          offsetX = e.clientX - p.x;
+          offsetY = e.clientY - p.y;
+          dragChildren = [];
+          rocket.parts = rocket.parts.filter(rp => rp !== p);
+        }
+        break;
+      }
+    }
+  }
+});
+
+// Dragging
+canvas.addEventListener('mousemove', e=>{
+  if(selectedPart){
+    const dx = e.clientX - offsetX - selectedPart.x;
+    const dy = e.clientY - offsetY - selectedPart.y;
+    selectedPart.x = e.clientX - offsetX;
+    selectedPart.y = e.clientY - offsetY;
+    dragChildren.forEach(p=>{ p.x += dx; p.y += dy; });
+  }
+});
+
+// Drop
+canvas.addEventListener('mouseup', e=>{
+  if(selectedPart){
+    if(e.clientX < vab.offsetWidth){
+      // Delete
+      selectedPart = null;
+      dragChildren = [];
+      return;
+    }
+    // Snap system
+    if(selectedPart && rocket.parts.length>0){
+      const topPart = rocket.parts[0];
+      selectedPart.y = topPart.y - selectedPart.height;
+      selectedPart.x = canvas.width/2;
+    }
+    rocket.parts.unshift(selectedPart, ...dragChildren);
+    selectedPart = null;
+    dragChildren = [];
+  }
+});
+
+// --- Launch Pad ---
+const launchPad = { x:canvas.width/2, y:canvas.height-100 };
+
+// --- Launch Controls ---
+document.getElementById('throttleUp').onclick = ()=>{ rocket.throttle=Math.min(1, rocket.throttle+0.1); }
+document.getElementById('throttleDown').onclick = ()=>{ rocket.throttle=Math.max(0, rocket.throttle-0.1); }
+document.getElementById('rotateLeft').onclick = ()=>{ rocket.angle -= 0.05; }
+document.getElementById('rotateRight').onclick = ()=>{ rocket.angle += 0.05; }
+document.getElementById('stage').onclick = ()=>{ rocket.stage++; }
+document.getElementById('toPad').onclick = ()=>{
+  mode='launch';
+  rocket.x=launchPad.x;
+  rocket.y=launchPad.y;
+  rocket.vx=0;
+  rocket.vy=0;
+  rocket.angle=0;
+  trajectory=[];
+  document.getElementById('launchControls').style.display='block';
+  vab.style.display='none';
+}
+
+// --- Physics ---
+function updatePhysics(dt){
+  if(!rocket.launched) return;
+  let thrust=0;
+  for(let i=rocket.stage;i<rocket.parts.length;i++){
+    if(rocket.parts[i].type==='engine') thrust+=rocket.parts[i].thrust||0;
+  }
+  let ax=0, ay=0;
+  planets.forEach(p=>{
+    let dx = p.x-rocket.x;
+    let dy = p.y-rocket.y;
+    let dist=Math.sqrt(dx*dx+dy*dy);
+    let g = p.mass/(dist*dist);
+    ax += dx/dist*g;
+    ay += dy/dist*g;
+  });
+  ax += Math.sin(rocket.angle)*thrust*rocket.throttle;
+  ay -= Math.cos(rocket.angle)*thrust*rocket.throttle;
+  rocket.vx += ax*dt;
+  rocket.vy += ay*dt;
+  rocket.x += rocket.vx*dt;
+  rocket.y += rocket.vy*dt;
+  trajectory.push({x:rocket.x, y:rocket.y});
+  if(trajectory.length>500) trajectory.shift();
+}
+
+// --- Draw ---
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(mode==='launch'){
+    planets.forEach(p=>{
+      let grad = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,p.radius);
+      grad.addColorStop(0, p.colors[0]);
+      grad.addColorStop(1, p.colors[1]);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+      ctx.fill();
+    });
+
+    ctx.strokeStyle='yellow';
+    ctx.beginPath();
+    trajectory.forEach((t,i)=> i===0?ctx.moveTo(t.x,t.y):ctx.lineTo(t.x,t.y));
+    ctx.stroke();
+  } else if(mode==='vab'){
+    ctx.fillStyle='#444';
+    ctx.fillRect(launchPad.x-50, launchPad.y-10, 100, 20);
+    ctx.fillStyle='white';
+    ctx.fillText("Launch Pad", launchPad.x-30, launchPad.y-15);
+  }
+
+  // Draw rocket
+  ctx.save(); ctx.translate(rocket.x,rocket.y); ctx.rotate(rocket.angle);
+  rocket.parts.forEach((p)=>{
+    ctx.fillStyle=p.type==='engine'?'red':
+                  p.type==='fuelLiquid'?'blue':
+                  p.type==='fuelSolid'?'orange':
+                  p.type==='pod'?'white':
+                  p.type==='wing'?'green':
+                  p.type==='decoupler'?'yellow':
+                  p.type==='heatshield'?'#888':'#ffd700';
+    ctx.fillRect(-p.width/2, -p.height/2, p.width, p.height);
+  });
+  ctx.restore();
+
+  // Draw ghost dragging part
+  if(selectedPart){
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = selectedPart.type==='engine'?'red':
+                    selectedPart.type==='fuelLiquid'?'blue':
+                    selectedPart.type==='fuelSolid'?'orange':
+                    selectedPart.type==='pod'?'white':
+                    selectedPart.type==='wing'?'green':
+                    selectedPart.type==='decoupler'?'yellow':
+                    selectedPart.type==='heatshield'?'#888':'#ffd700';
+    ctx.fillRect(selectedPart.x-selectedPart.width/2, selectedPart.y-selectedPart.height/2, selectedPart.width, selectedPart.height);
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(selectedPart.x-selectedPart.width/2, selectedPart.y-selectedPart.height/2, selectedPart.width, selectedPart.height);
+    ctx.restore();
+  }
+}
+
+// --- Loop ---
+let last = performance.now();
+function loop(){
+  let now = performance.now();
+  let dt = (now-last)/16;
+  last = now;
+  updatePhysics(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// --- Launch ---
+canvas.addEventListener('dblclick', ()=>{ if(mode==='launch') rocket.launched=true; });
+</script>
+</body>
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chaos Game Launcher</title>
+
+<style>
+:root {
+  --pink:#ff5fa2;
+}
+
+/* ===== RESET ===== */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Comic Sans MS", cursive;
+  background: transparent;
+}
+
+/* ===== BACKGROUND ===== */
+.bg {
+  position: fixed;
+  inset: -50%;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(255,255,255,0.04) 0px,
+      rgba(255,255,255,0.04) 2px,
+      transparent 2px,
+      transparent 40px
+    ),
+    radial-gradient(circle at 30% 30%, #ff5fa222, transparent 40%),
+    radial-gradient(circle at 70% 70%, #38bdf822, transparent 40%),
+    linear-gradient(120deg, #0f0f1a, #1a1a2e);
+  background-size: 300px 300px, 100% 100%, 100% 100%, 100% 100%;
+  animation: bgScroll 40s linear infinite;
+  transform: translate(var(--mx,0px), var(--my,0px));
+}
+
+@keyframes bgScroll {
+  to { transform: translate(300px,300px); }
+}
+
+/* ===== PARTICLES ===== */
+.particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.particle, .dust {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.particle {
+  width: 2px;
+  height: 2px;
+  background: white;
+  opacity: .35;
+  animation: drift linear infinite;
+}
+
+@keyframes drift {
+  from { transform: translate(0,0); opacity: 0; }
+  10% { opacity: .35; }
+  to { transform: translate(240px,220px); opacity: 0; }
+}
+
+.dust {
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, rgba(255,255,255,.6), transparent 70%);
+  opacity: .25;
+  animation: dustFloat linear infinite;
+}
+
+@keyframes dustFloat {
+  from { transform: translate(0,0); opacity: 0; }
+  10% { opacity: .25; }
+  to { transform: translate(60px,-200px); opacity: 0; }
+}
+
+/* ===== LAYOUT ===== */
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ===== LAUNCHER ===== */
+.launcher {
+  width: 420px;
+  padding: 22px;
+  border-radius: 26px;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 25px 50px rgba(0,0,0,.35);
+}
+
+h1 {
+  margin: 0 0 14px;
+  color: var(--pink);
+  transform: rotate(-2deg);
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.05em;
+  border-radius: 14px;
+  border: 3px dashed var(--pink);
+  outline: none;
+  margin-bottom: 12px;
+}
+
+/* ===== GAME LIST (MINIMAL) ===== */
+.list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.list::-webkit-scrollbar {
+  width: 6px;
+}
+.list::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,.15);
+  border-radius: 10px;
+}
+
+.game {
+  position: relative;
+  padding: 10px 12px;
+  margin: 4px 0;
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background .15s, transform .15s;
+}
+
+.game::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 20%;
+  width: 4px;
+  height: 60%;
+  background: var(--pink);
+  border-radius: 10px;
+  opacity: 0;
+}
+
+.game:hover {
+  background: rgba(0,0,0,.06);
+  transform: translateX(4px);
+}
+
+.game:hover::before {
+  opacity: 1;
+}
+
+/* ===== OUTLINED BUTTONS ===== */
+.buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+button {
+  flex: 1;
+  padding: 14px;
+  font-size: 1.1em;
+  font-weight: bold;
+  border-radius: 22px;
+  cursor: pointer;
+
+  background: transparent;
+  border: 3px solid currentColor;
+  color: #111;
+
+  transition: transform .12s, box-shadow .12s, background .12s;
+}
+
+.random { color: limegreen; }
+.last { color: deepskyblue; }
+
+button:hover {
+  background: rgba(255,255,255,.35);
+  box-shadow:
+    0 0 0 4px rgba(0,0,0,.06),
+    0 0 18px currentColor;
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,.1),
+    0 0 8px currentColor;
+}
+</style>
+</head>
+
+<body>
+
+<div class="bg" id="bg"></div>
+<div class="particles" id="particles"></div>
+
+<div class="launcher">
+  <h1>🎲 CHAOS GAME LAUNCHER</h1>
+  <input id="search" placeholder="Search your doom..." autocomplete="off">
+  <div class="list" id="gameList"></div>
+  <div class="buttons">
+    <button class="random" onclick="randomGame()">🎲 Random</button>
+    <button class="last" onclick="lastGame()">⏮ Last</button>
+  </div>
+</div>
+
+<script>
+/* ===== PARALLAX ===== */
+const bg = document.getElementById("bg");
+addEventListener("mousemove", e => {
+  bg.style.setProperty("--mx", (e.clientX / innerWidth - .5) * 15 + "px");
+  bg.style.setProperty("--my", (e.clientY / innerHeight - .5) * 15 + "px");
+});
+
+/* ===== PARTICLES ===== */
+const particles = document.getElementById("particles");
+
+for (let i=0;i<40;i++) {
+  const p=document.createElement("div");
+  p.className="particle";
+  p.style.left=Math.random()*100+"vw";
+  p.style.top=Math.random()*100+"vh";
+  p.style.animationDuration=20+Math.random()*20+"s";
+  p.style.animationDelay=Math.random()*10+"s";
+  particles.appendChild(p);
+}
+
+for (let i=0;i<25;i++) {
+  const d=document.createElement("div");
+  d.className="dust";
+  d.style.left=Math.random()*100+"vw";
+  d.style.top=100+Math.random()*50+"vh";
+  d.style.animationDuration=30+Math.random()*30+"s";
+  d.style.animationDelay=Math.random()*20+"s";
+  particles.appendChild(d);
+}
+
+/* ===== GAME LOGIC ===== */
+
+// We moved the games.json data directly into this array!
+const games =[
+  "Silly things/10todawn/index.html",
+  "Silly things/A Difficult Game About Climbing (1).html",
+  "Silly things/A Small World Cup.html",
+  "Silly things/Amanda the Adventurer.html",
+  "Silly things/Aquapark.io.html",
+  "Silly things/Awesome Tanks.html",
+  "Silly things/Bad Parenting 1.html",
+  "Silly things/Baldi's Basics.html",
+  "Silly things/Basket Random.html",
+  "Silly things/Boxing Random.html",
+  "Silly things/Bridge Race.html",
+  "Silly things/Buckshot Roulette.html",
+  "Silly things/Celeste.html",
+  "Silly things/Cookie Clicker.html",
+  "Silly things/Count Masters_Stickman Games.html",
+  "Silly things/Crazy Cars.html",
+  "Silly things/EaglercraftX_1.8.html",
+  "Silly things/Five Nights at Freddy's.html",
+  "Silly things/Five Nights at Freddy's 2.html",
+  "Silly things/Five Nights at Freddy's 3.html",
+  "Silly things/Five Nights at Freddy's 4.html",
+  "Silly things/Five Nights at Freddy's Sister Location.html",
+  "Silly things/Flip Master.html",
+  "Silly things/Gn-math/index.html",
+  "Silly things/Getting Over It with Bennett Foddy.html",
+  "Silly things/Happy Wheels.html",
+  "Silly things/R.E.P.O.html",
+  "Silly things/Raft.html",
+  "Silly things/Rainbow Obby.html",
+  "Silly things/Run 1.html",
+  "Silly things/Run 2.html",
+  "Silly things/Run 3.html",
+  "Silly things/Sandboxels.html",
+  "Silly things/Schoolboy Runaway.html",
+  "Silly things/Slowroads.html",
+  "Silly things/Solar Smash.html",
+  "Silly things/Soundboard.html",
+  "Silly things/Space.html",
+  "Silly things/Stickman Hook.html",
+  "Silly things/Terraria.html",
+  "Silly things/Tiny Fishing.html",
+  "Silly things/among-us/index.html",
+  "Silly things/avalanche/index.html",
+  "Silly things/backrooms/index.html",
+  "Silly things/basketball-stars/index.html",
+  "Silly things/bitlife/index.html",
+  "Silly things/bloonstd2/index.html",
+  "Silly things/brainrot.html",
+  "Silly things/buttongame.html",
+  "Silly things/cell-machine/index.html",
+  "Silly things/cellmachine/index.html",
+  "Silly things/chrome-dino/index.html",
+  "Silly things/clicker.html",
+  "Silly things/deal-or-no-deal/index.html",
+  "Silly things/death-run-3d/index.html",
+  "Silly things/DogeMiner/index.html",
+  "Silly things/doodle-jump/index.html",
+  "Silly things/draw-the-hill/index.html",
+  "Silly things/ducklife1/index.html",
+  "Silly things/ducklife2/index.html",
+  "Silly things/ducklife3/index.html",
+  "Silly things/exo/index.html",
+  "Silly things/finalearth2/index.html",
+  "Silly things/flappy-bird/index.html",
+  "Silly things/geometrydash/index.html",
+  "Silly things/getawayshootout/index.html",
+  "Silly things/hollowknight.html",
+  "Silly things/impossiblequiz/index.html",
+  "Silly things/interactivebuddy/index.html",
+  "Silly things/kittencannon/index.html",
+  "Silly things/motox3m/index.html",
+  "Silly things/motox3m-pool/index.html",
+  "Silly things/motox3m-spooky/index.html",
+  "Silly things/motox3m-winter/index.html",
+  "Silly things/polytrack/index.html",
+  "Silly things/ragdollarchers/index.html",
+  "Silly things/ragdollhit/index.html",
+  "Silly things/result.html",
+  "Silly things/retrobowl/index.html",
+  "Silly things/ropepolice/index.html",
+  "Silly things/slope/index.html",
+  "Silly things/yohohoio/index.html",
+  "Silly things/Five Nights at Epstein's.html"
+];
+
+const listEl=document.getElementById("gameList");
+const search=document.getElementById("search");
+
+// Start rendering immediately!
+render();
+
+function cleanName(p){
+  p=p.split("/");
+  let n=p.at(-1)==="index.html"?p.at(-2):p.at(-1).replace(".html","");
+  return n.replace(/[-_]/g," ").replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+function render(f=""){
+  listEl.innerHTML="";
+  games.filter(g=>cleanName(g).toLowerCase().includes(f))
+    .forEach(g=>{
+      const d=document.createElement("div");
+      d.className="game";
+      d.textContent=cleanName(g);
+      d.onclick=()=>launch(g);
+      listEl.appendChild(d);
+    });
+}
+
+function launch(p){
+  localStorage.setItem("lastGame",p);
+  setTimeout(()=>location.href=p,200);
+}
+
+function randomGame(){
+  launch(games[Math.floor(Math.random()*games.length)]);
+}
+
+function lastGame(){
+  const l=localStorage.getItem("lastGame");
+  l?launch(l):alert("Chaos has no memory yet.");
+}
+
+search.addEventListener("input",e=>render(e.target.value.toLowerCase()));
+search.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const g=document.querySelector(".game");
+    if(g) g.click();
+  }
+});
+</script>
+
+</body>
+</html>
